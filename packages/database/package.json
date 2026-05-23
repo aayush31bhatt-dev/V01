@@ -1,0 +1,25 @@
+{
+  "name": "@v01/database",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "prisma:generate": "prisma generate --schema prisma/schema.prisma"
+  },
+  "dependencies": {
+    "@prisma/client": ">=5.0.0",
+    "@prisma/adapter-better-sqlite3": ">=7.0.0",
+    "drizzle-orm": ">=0.36.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": ">=7.6.0",
+    "@types/node": ">=20.0.0",
+    "prisma": ">=5.0.0",
+    "typescript": "^5.9.3"
+  }
+}

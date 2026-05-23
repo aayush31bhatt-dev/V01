@@ -1,0 +1,322 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum SessionStatus {
+  pending
+  running
+  paused
+  completed
+  error
+}
+
+enum MessageRole {
+  user
+  assistant
+  system
+}
+
+enum MessageStatus {
+  sent
+  streaming
+  complete
+  error
+}
+
+enum TaskStatus {
+  pending
+  running
+  completed
+  error
+}
+
+enum FileArtifactKind {
+  created
+  modified
+  referenced
+}
+
+enum FilePreviewKind {
+  code
+  ui
+  stack
+}
+
+model User {
+  id          String       @id @default(cuid())
+  email       String?      @unique
+  displayName String?
+  metadataJson String      @default("{}")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @default(now())
+  projects    Project[]
+  preferences Preference[]
+}
+
+model Project {
+  id             String           @id
+  userId         String?
+  name           String
+  rootPath       String?
+  metadataJson   String           @default("{}")
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @default(now())
+  lastOpenedAt   DateTime         @default(now())
+  user           User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  sessions       Session[]
+  tasks          Task[]
+  fileArtifacts  FileArtifact[]
+  workspaceState WorkspaceState?
+  preferences    Preference[]
+  openTabs       OpenTab[]
+  aiResponses    AIResponse[]
+  executionEvents ExecutionEvent[]
+
+  @@index([userId])
+  @@index([rootPath])
+  @@index([lastOpenedAt])
+}
+
+model Session {
+  id             String           @id
+  projectId      String
+  title          String
+  originalPrompt String           @default("")
+  summary        String           @default("")
+  content        String           @default("")
+  status         SessionStatus    @default(pending)
+  progress       Int              @default(0)
+  x              Float            @default(0)
+  y              Float            @default(0)
+  zoom           Float            @default(1)
+  accent         String           @default("#75D1B3")
+  expanded       Boolean          @default(true)
+  isOpen         Boolean          @default(true)
+  activeTaskId   String?
+  selectedFileId String?
+  historyJson    String           @default("[]")
+  metadataJson   String           @default("{}")
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @default(now())
+  completedAt    DateTime?
+  project        Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  messages       Message[]
+  tasks          Task[]
+  fileArtifacts  FileArtifact[]
+  aiResponses    AIResponse[]
+  memories       SessionMemory[]
+  executionEvents ExecutionEvent[]
+
+  @@index([projectId, updatedAt])
+  @@index([status])
+}
+
+model Message {
+  id              String        @id
+  sessionId       String
+  role            MessageRole
+  content         String
+  status          MessageStatus @default(complete)
+  sourceSessionId String?
+  tokenEstimate   Int?
+  metadataJson    String        @default("{}")
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @default(now())
+  session         Session       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@index([role])
+}
+
+model SessionMemory {
+  id              String   @id @default(cuid())
+  sessionId       String
+  kind            String   @default("working")
+  contextJson     String   @default("{}")
+  summary         String?
+  tokenEstimate   Int?
+  strategy        String   @default("baseline")
+  lastCompactedAt DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now())
+  session         Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, kind])
+  @@index([sessionId, updatedAt])
+}
+
+model Task {
+  id             String          @id
+  projectId      String
+  sessionId      String?
+  title          String
+  description    String?
+  status         TaskStatus      @default(pending)
+  priority       Int             @default(3)
+  x              Float           @default(0)
+  y              Float           @default(0)
+  linkedFileIdsJson String       @default("[]")
+  expanded       Boolean         @default(false)
+  metadata       String          @default("")
+  logJson        String          @default("[]")
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @default(now())
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  session        Session?        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  fileArtifacts  FileArtifact[]
+  aiResponses    AIResponse[]
+  executionEvents ExecutionEvent[]
+
+  @@index([projectId, updatedAt])
+  @@index([sessionId, status])
+  @@index([status])
+}
+
+model FileArtifact {
+  id            String            @id
+  projectId     String
+  sessionId     String?
+  taskId        String?
+  name          String
+  path          String?
+  relativePath  String
+  kind          FileArtifactKind
+  previewKind   FilePreviewKind
+  previewJson   String            @default("[]")
+  language      String
+  mockContent   String            @default("")
+  x             Float             @default(0)
+  y             Float             @default(0)
+  isOpen        Boolean           @default(true)
+  changeSummary String?
+  metadataJson  String            @default("{}")
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @default(now())
+  project       Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  session       Session?          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  task          Task?             @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, updatedAt])
+  @@index([sessionId])
+  @@index([taskId])
+  @@index([relativePath])
+}
+
+model ExecutionEvent {
+  id              String      @id @default(cuid())
+  projectId       String
+  sessionId       String?
+  taskId          String?
+  aiResponseId    String?
+  kind            String
+  status          String
+  originalPrompt  String?
+  message         String?
+  payloadJson     String      @default("{}")
+  fileChangesJson String      @default("[]")
+  error           String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime    @default(now())
+  project         Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  session         Session?    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  task            Task?       @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  aiResponse      AIResponse? @relation(fields: [aiResponseId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, createdAt])
+  @@index([sessionId, createdAt])
+  @@index([taskId, createdAt])
+  @@index([kind])
+  @@index([status])
+}
+
+model WorkspaceState {
+  id              String   @id @default(cuid())
+  projectId       String   @unique
+  viewportX       Float    @default(-180)
+  viewportY       Float    @default(-80)
+  viewportZoom    Float    @default(1)
+  activeSessionId String?
+  selectedFileId  String?
+  activeFilePath  String?
+  leftTab         String   @default("explorer")
+  terminalOpen    Boolean  @default(true)
+  layoutJson      String   @default("{}")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now())
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Preference {
+  id          String   @id @default(cuid())
+  userId      String?
+  projectId   String?
+  key         String
+  valueJson   String   @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now())
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, key])
+  @@index([userId, key])
+}
+
+model AIResponse {
+  id               String           @id @default(cuid())
+  projectId        String
+  sessionId        String
+  taskId           String?
+  provider         String
+  model            String
+  prompt           String
+  normalizedPrompt String?
+  response         String
+  status           String           @default("complete")
+  inputTokens      Int?
+  outputTokens     Int?
+  rawJson          String           @default("{}")
+  createdAt        DateTime         @default(now())
+  project          Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  session          Session          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  task             Task?            @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  executionEvents  ExecutionEvent[]
+
+  @@index([projectId, createdAt])
+  @@index([sessionId, createdAt])
+  @@index([taskId])
+}
+
+model OpenTab {
+  id              String   @id @default(cuid())
+  projectId       String
+  path            String
+  name            String
+  language        String
+  order           Int      @default(0)
+  active          Boolean  @default(false)
+  dirty           Boolean  @default(false)
+  isVirtual       Boolean  @default(false)
+  contentSnapshot String?
+  originalContent String?
+  mtimeMs         Float?
+  metadataJson    String   @default("{}")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now())
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, path])
+  @@index([projectId, order])
+}
+
+model LocalMigration {
+  id        String   @id
+  appliedAt DateTime @default(now())
+}
