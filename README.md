@@ -119,7 +119,7 @@ To coordinate remote development tasks, the mobile app UI is structured to repli
 │  │               │                  │  │
 │  │               v                  │  │
 │  │  ┌────────────────────────────┐  │  │
-│  │  │ Session: Setup Auth Routes  │  │  │
+│  │  │ Session: Setup Auth Routes │  │  │
 │  │  └────────────────────────────┘  │  │
 │  └──────────────────────────────────┘  │
 │                                        │
